@@ -3,7 +3,7 @@ const productHelpers = require("../helpers/product-helpers");
 var router = express.Router();
 const userHelpers = require("../helpers/user-helpers");
 const verifyLogin = (req, res, next) => {
-  if (req.session.loggedIn) {
+  if (req.session.userLoggedIn) {
     next();
   } else {
     res.redirect("/login");
@@ -28,11 +28,11 @@ router.get("/", async function (req, res, next) {
 });
 
 router.get("/login", (req, res) => {
-  if (req.session.loggedIn) {
+  if (req.session.user) {
     res.redirect("/");
   } else {
-    res.render("user/login", { loginErr: req.session.loginErr });
-    req.session.loginErr = false;
+    res.render("user/login", { loginErr: req.session.userLoginErr });
+    req.session.user.userLoginErr = false;
   }
 });
 
@@ -45,8 +45,8 @@ router.post("/signup", (req, res) => {
   // but password has to be encrypted before storing.
   userHelpers.doSignup(req.body).then((response) => {
     console.log(response);
-    req.session.loggedIn = true;
     req.session.user = response;
+    req.session.user.loggedIn = true;
     res.redirect("/");
   });
 });
@@ -54,22 +54,28 @@ router.post("/signup", (req, res) => {
 router.post("/login", (req, res) => {
   userHelpers.doLogin(req.body).then((response) => {
     if (response.status) {
-      req.session.loggedIn = true;
       req.session.user = response.user;
+      req.session.user.loggedIn = true;
       res.redirect("/");
     } else {
-      req.session.loginErr = "Invalid username or password!!!";
+      req.session.userloginErr = "Invalid username or password!!!";
       res.redirect("/login");
     }
   });
 });
 router.get("/logout", (req, res) => {
-  req.session.destroy();
+  //req.session.destroy();
+  req.session.user = null;
+  req.session.userLoggedIn = false;
   res.redirect("/");
 });
 router.get("/cart", verifyLogin, async (req, res) => {
   let products = await userHelpers.getCartProducts(req.session.user._id);
-  let totalValue = await userHelpers.getTotalAmount(req.session.user._id);
+  let totalValue = 0;
+  if(products.length>0){
+    totalValue = await userHelpers.getTotalAmount(req.session.user._id);
+  }
+  
   console.log(products);
   res.render("user/cart", { products, user: req.session.user, totalValue });
 });
@@ -124,7 +130,15 @@ router.get('/view-order-products/:id', async (req, res) => {
   res.render('user/view-order-products', {user: req.session.user, products})
 })
 router.post('/verify-payment', (req, res) => {
-  console.log("**12***");
   console.log(req.body);
+  userHelpers.verifyPayment(req.body).then(()=> {
+    userHelpers.changePaymentStatus(req.body['order[receipt]']).then(() => {
+      console.log("Payment successfull");
+      res.json({status: true});
+    })
+  }).catch((err) => {
+    console.log(err);
+    res.json({status: false});
+  })
 })
 module.exports = router;

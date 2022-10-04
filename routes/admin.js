@@ -2,6 +2,13 @@ var express = require('express');
 const { render } = require('../app');
 const productHelpers = require('../helpers/product-helpers');
 var router = express.Router();
+const verifyLogin = (req, res, next) => {
+  if (req.session.admin.loggedIn) {
+    next();
+  } else {
+    res.redirect("/login");
+  }
+};
 //var productHelpers = require('../helpers/product-helpers');
 /* GET users listing. */
 router.get('/', function(req, res, next) {
@@ -46,4 +53,12 @@ router.post('/edit-product/:id', (req, res) => {
     }
   });
 })
+router.get("/login", (req, res) => {
+  if (req.session.admin) {
+    res.redirect("/");
+  } else {
+    res.render("admin/login", { loginErr: req.session.userLoginErr });
+    req.session.user.userLoginErr = false;
+  }
+});
 module.exports = router;
